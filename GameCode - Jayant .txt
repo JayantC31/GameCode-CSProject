@@ -1,0 +1,1395 @@
+# import libararies and modules
+
+import pygame, pygame.font
+
+# initialize modules
+pygame.init()
+pygame.font.init()
+
+# COLOURS; this uses RGB to set colours of everything
+background_colour = (18, 126, 190)  # background colour used for my screens
+black = (0, 0, 0)
+white = (255, 255, 255)
+red = (150, 0, 0)
+green = (0, 100, 0)
+blue = (0, 0, 150)
+bright_blue = (0, 0, 255)
+bright_red = (255, 0, 0)
+bright_green = (0, 255, 0)
+grey = (50, 50, 50)
+
+# decides width and height of screen, and how big screen should be; (1280x720)
+display_width = 1280
+display_height = 720
+screen = pygame.display.set_mode((display_width, display_height))
+
+# displays caption as 2D Carball
+pygame.display.set_caption('Motor Mayhem')
+
+# sets the clock, and fps
+clock = pygame.time.Clock()
+
+# Colour Options of background
+backg = ["Jungle", "Night", "Sunny"]  # tuple to show options of background colour
+chosenbackgcolour = (0, 0, 0)  # rgb, changable, to set colour of background
+
+# colour options of car
+carcolour = ["Blue", "Red", "Purple", "Green"]  # tuple to show options of car colour
+chosencarcolour = (0, 0, 0)  # rgb, changable, to set colour of car
+
+# amount of time for the game(in seconds) and default gravity check
+GameTime = 60
+Gravity = 1
+
+# Login Information including scores using a text file
+credentials = open('LoginInfo.txt', 'r')  # r = read file
+print(credentials.read())  # prints the login info to user as a check
+
+score = open('ListOfScore', 'r')
+print(score.read())  # prints current score to user as a check
+
+font = pygame.font.Font(None, 32)  # None activates standard pygame font, size is 32
+User = False  # has username been selected
+Pass = False  # Has password been selected
+loginscreen = False  # is the player on the log in screen or not
+username = ""
+password = ""
+loggedin = False  # has user logged in
+PlayerScore = 0
+checkTime = False  # is user checking for Game Time
+checkSetting = False  # is user in the settings screen
+AI = True  # Assume 1vAI unless chosen otherwise
+
+# background music for game, which is shown throughout the game
+Volume = 0.5  # default volume set to 50%
+pygame.mixer.init()
+pygame.mixer.music.load('music.mp3')
+pygame.mixer.music.play(-1)  # -1 = music plays indefinitely
+pygame.mixer.music.set_volume(Volume)
+
+# Sounds used for the game
+GameoverSound = pygame.mixer.Sound('gameover.wav')  # Load a sound.
+ScoreSound = pygame.mixer.Sound('add_score.wav')  # Load a sound.
+jumpSound = pygame.mixer.Sound('jump.wav')  # Load a sound.
+
+
+
+def ScreenText(text, size, x, y): #NEW DEF TO CREATE TEXT
+    style = pygame.font.SysFont("comicsansms", size) # style uses same font, differernt sizes
+    textSurf, textRect = text_objects(text, style)
+    textRect.center = (x, y)
+    screen.blit(textSurf, textRect)
+
+
+def text_objects(text, font):  # code for the text that is displayed
+    textSurface = font.render(text, True, black)  # colour of text if black
+    return textSurface, textSurface.get_rect()  # returns text and the rect of text
+
+
+def button(msg, x, y, w, h, InCol, AcCol, action=None):
+    # msg = text, x/y = coordinates of button, w/h = width and height of button
+    # InCol = inactive colour, colour that appears when nothing happens
+    # AcCol = active colour, colour that appears when mouse hovers over button
+    # action is automatically set to None (nothing is happening)
+    mouse = pygame.mouse.get_pos()  # constantly get position of mouse and if mouse is clicked
+    click = pygame.mouse.get_pressed()
+    # how the button is pressed; by checking if mouse is clicked or not
+    if (x + w > mouse[0] > x) and (y + h > mouse[1] > y):
+        pygame.draw.rect(screen, AcCol, (x, y, w, h))
+        # action set to None, so if there is an action, and the user clicks the box, action occurs
+        if click[0] == 1 and action != None:
+            action()
+    else:
+        pygame.draw.rect(screen, InCol, (x, y, w, h))
+    # font text of button and size
+    ScreenText(msg,30,(x + (w / 2)), (y + (h / 2))) # adds text to the screen
+
+class InputBox:
+
+    def __init__(self, x, y, w, h, text=''):
+        self.rect = pygame.Rect(x, y, w, h)  # x/y cooridnates for middle of box, w = width, h = height of box
+        self.colour = black  # colour of textbox
+        self.text = text  # text chosen from keyboard inputs
+        self.txt_surface = font.render(text, True, self.colour)
+        # font is chosen, based off colour chosen and pygame default font
+        self.active = False  # assume textbox not pressed
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # If the user clicked on the input_box rect
+            if self.rect.collidepoint(event.pos):
+                # if the user clicks on box, there is a collision
+                # Toggle the active variable from yes to no
+                self.active = not self.active
+            else:
+                self.active = False
+            # Change the colour of the input box,if pressed, to bright blue
+            self.colour = grey if self.active else black
+        if event.type == pygame.KEYDOWN:  # check if user inputs any key
+            if self.active:
+                if event.key == pygame.K_RETURN:  # check if user presses enter key
+                    print(self.text + " entered")  # save text to self.text and print it to user
+
+                    global User, Pass, username, password, loginscreen, loggedin, checkTime
+
+                    # Test login
+                    if loginscreen == True and User == False:
+                        # check if username entered inside login screen
+                        username = self.text
+                        User = True  # username has been inputted by user
+                        print("Username input:", username)
+                    elif loginscreen == True and User == True:
+                        password = self.text
+                        Pass = True
+                        print("Password input:", password)
+                        for line in open('LoginInfo.txt',
+                                         'r').readlines():  # Read the lines
+                            login_info = line.split()
+                            # Split on the space, and store the results in a list of two strings
+                            if Pass == True:
+                                if username == login_info[0] and password == login_info[1]:
+                                    # [0] = first value in line in text file, [1] = 2nd value
+                                    print("Correct credentials!")
+                                    loggedin = True
+                                elif username == login_info[0] and password != login_info[1]:
+                                    print("Incorrect Password.")
+                                elif loggedin == False and username != login_info[0] and password != login_info[1]:
+                                    print("Incorrect credentials.")
+
+                    # check what background is selected, and change the colour to the input selected.
+                    if self.text == backg[0]:
+                        print("Jungle Selected")
+                        global chosenbackgcolour
+                        chosenbackgcolour = (34, 139, 34)
+                    if self.text == backg[1]:
+                        print("Night Selected")
+                        chosenbackgcolour = (0, 0, 255)
+                    if self.text == backg[2]:
+                        print("Sunny Selected")
+                        chosenbackgcolour = (255, 233, 0)
+                    # Check what colour is selected
+                    if self.text == carcolour[0]:
+                        print("Colour Blue selected")
+                        global chosencarcolour
+                        chosencarcolour = (0, 0, 255)
+                        print(chosencarcolour)
+                    if self.text == carcolour[1]:
+                        print("Colour Red selected")
+                        chosencarcolour = (255, 0, 0)
+                        print(chosencarcolour)
+                    if self.text == carcolour[2]:
+                        print("Colour Purple selected")
+                        chosencarcolour = (255, 0, 255)
+                        print(chosencarcolour)
+                    if self.text == carcolour[3]:
+                        print("Colour Green selected")
+                        chosencarcolour = (0, 255, 0)
+                        print(chosencarcolour)
+
+                    if checkTime == True and self.text.isdigit():
+                        print("User input is an Integer ")
+                        global GameTime
+                        GameTime = int(self.text)
+                        if GameTime >= 30 and GameTime <= 180:
+                            print("Time set: " + str(GameTime))
+                        else:
+                            GameTime = 60
+                            print("Time must be between 30 and 180 seconds")
+
+                    self.text = ''  # reset text to ''
+                elif event.key == pygame.K_BACKSPACE:
+                    # if they press backspace, go back 1 letter
+                    self.text = self.text[:-1]
+                else:
+                    self.text += event.unicode
+                    # text is based off unicode language
+                # render the text again
+                self.txt_surface = font.render(self.text, True, self.colour)
+
+    def update(self):
+        # Resize the box if the text gets too long, based on inputs
+        width = max(200, self.txt_surface.get_width() + 10)
+        self.rect.w = width
+
+    def draw(self, screen):
+        # print the text onto the screen, inside the textbox
+        screen.blit(self.txt_surface, (self.rect.x + 5, self.rect.y + 5))
+        # blit the box onto the screen
+        pygame.draw.rect(screen, self.colour, self.rect, 2)
+
+
+class Slider():
+    def __init__(self, name, val, maxi, mini, pos):
+        self.val = val  # value of slider
+        self.maxi = maxi  # the max the slider can move(right)
+        self.mini = mini  # the min the slider can move(left)
+        self.xpos = pos  # x and y location of slider box
+        self.ypos = 450
+        self.surf = pygame.surface.Surface((100, 50))  # surface of box
+        self.hit = False  # check if the box or slider has been hit (clicked on by mouse)
+        self.txt_surf = font.render(name, True, white)  # text colour, white
+        self.txt_rect = self.txt_surf.get_rect(center=(50, 15))  # center of text, x/y values of text
+        self.surf.fill(black)  # background colour of slider, black
+        pygame.draw.rect(self.surf, white, [0, 0, 100, 50], 3)  # box colour
+        pygame.draw.rect(self.surf, black, [10, 10, 80, 10], 0)  # colour behind the text
+        pygame.draw.rect(self.surf, background_colour, [10, 30, 80, 5], 0)  # colour inside slider
+        self.surf.blit(self.txt_surf, self.txt_rect)  # blits both box and rect onto the screen
+        self.button_surf = pygame.surface.Surface((20, 20))
+        transparent = (1, 1, 1)  # RGB to make the background of text transparent
+        self.button_surf.fill(transparent)  # fill the box and colour of background transparent
+        self.button_surf.set_colorkey(transparent)
+        pygame.draw.circle(self.button_surf, black, (10, 10), 6, 0)  # colour of outline of slider, black
+        pygame.draw.circle(self.button_surf, white, (10, 10), 4, 0)  # inside colour of slider, white
+
+    def draw(self):
+
+        surf = self.surf.copy()
+        # check the position of the slider, between the maximum and minimum values of the slider
+        pos = (10 + int((self.val - self.mini) / (self.maxi - self.mini) * 80), 33)
+        self.button_rect = self.button_surf.get_rect(center=pos)
+        surf.blit(self.button_surf, self.button_rect)
+        self.button_rect.move_ip(self.xpos, self.ypos)  # changes rect based on the new x/y values of slider
+
+        screen.blit(surf, (self.xpos, self.ypos))  # blits new x/y values to screen
+
+    def move(self):
+
+        # changes value of slider based on mouse press
+        self.val = (pygame.mouse.get_pos()[0] - self.xpos - 10) / 80 * (self.maxi - self.mini) + self.mini
+        if self.val < self.mini:
+            self.val = self.mini
+        if self.val > self.maxi:
+            self.val = self.maxi
+
+
+def game_intro():
+    start_screen = True
+    while start_screen:
+        for event in pygame.event.get():  # while event happens
+            if event.type == pygame.QUIT:
+                pygame.quit()  # if user presses X, GUI quits, module is forced to quit
+                quit()  # quit code
+
+        # displays background colour in background
+        screen.fill(background_colour)
+        bg = pygame.image.load('WelcomeScreen.png')  # load image to the game using pygame
+        screen.blit(bg, (0, 0))  # blit it to screen, top right of image is (0,0)
+        # buttons to start login screen or quit game
+        button("Log In", 250, 450, 200, 100, green, bright_green, login_screen)
+        button("Quit", 850, 450, 200, 100, red, bright_red, quit)
+        pygame.display.update()
+        clock.tick(60)
+
+
+def login_screen():
+    login = True
+    global loginscreen
+    loginscreen = True
+    global loggedin
+
+    while login:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                quit()
+
+        def main():
+            input_box1 = InputBox(540, 300, 140, 32)
+            input_box2 = InputBox(540, 400, 140, 32)
+            input_boxes = [input_box1, input_box2]
+            done = False
+
+            while not done:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        done = True
+                    for box in input_boxes:
+                        box.handle_event(event)
+
+                for box in input_boxes:
+                    box.update()
+
+                screen.fill((background_colour))
+                bg = pygame.image.load('LoginScreen.png')
+                screen.blit(bg, (0, 0))
+
+                for box in input_boxes:
+                    box.draw(screen)
+
+                    if loggedin == True:
+                        button("Menu", 540, 470, 200, 80, green, bright_green, menu_loop)
+                    button("Quit", 540, 620, 200, 80, red, bright_red, quit)
+
+                pygame.display.update()
+                pygame.display.flip()
+                clock.tick(60)
+
+        if __name__ == '__main__':
+            main()
+
+        quit()
+
+
+def menu_loop():
+    menu = True
+
+    while menu:  # while menu is running
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:  # if user presses quit or X
+                # quit game
+                quit()
+
+        screen.fill(background_colour)
+        # replace background with background image
+        # checks what background colour has been chosen and displays set image
+        if chosenbackgcolour == (0, 0, 0):
+            bg = pygame.image.load('BlueMenu.png')
+        elif chosenbackgcolour == (0, 0, 255):
+            bg = pygame.image.load('NightMenu.png')
+        elif chosenbackgcolour == (255, 233, 0):
+            bg = pygame.image.load('SunnyMenu.png')
+        elif chosenbackgcolour == (34, 139, 34):
+            bg = pygame.image.load('JungleMenu.png')
+
+        screen.blit(bg, (0, 0))  # display top right of image to (0,0)
+
+        ScreenText("Motor Mayhem", 80,(display_width / 2), (display_height / 8))
+
+        ScreenText(username, 40, 429, 635)
+        button("Start", 100, 112, 200, 80, green, bright_green, game_loop)
+        button("Menu", 100, 208, 200, 80, white, white, )
+        button("Scores", 100, 304, 200, 80, blue, bright_blue, scoreboard_loop)
+        button("Colours", 100, 401, 200, 80, blue, bright_blue, colours_loop)
+        button("Settings", 100, 497, 200, 80, blue, bright_blue, settings_loop)
+        button("Sliders", 100, 595, 200, 80, blue, bright_blue, sliders_loop)
+        button("Quit", 1008, 595, 200, 80, red, bright_red, quit)
+
+        pygame.display.update()
+        pygame.display.flip()
+        clock.tick(60)
+
+
+def sliders_loop():
+    volumeCheck = True
+    # start position of circle, max, min, x value of box
+    volume = Slider("Volume", 10, 15, 1, 500)
+    gravityset = Slider("Gravity", 60, 180, 30, 900)
+    slides = [volume, gravityset]
+    if chosenbackgcolour == (0, 0, 0):
+        bg = pygame.image.load('BlueSliders.png')
+    elif chosenbackgcolour == (0, 0, 255):
+        bg = pygame.image.load('NightSliders.png')
+    elif chosenbackgcolour == (255, 233, 0):
+        bg = pygame.image.load('SunnySliders.png')
+    elif chosenbackgcolour == (34, 139, 34):
+        bg = pygame.image.load('JungleSliders.png')
+    ScreenText(username, 40, 429, 635)
+
+    while volumeCheck:
+
+        screen.blit(bg, (0, 0))
+        button("Start", 100, 112, 200, 80, green, bright_green, game_loop)
+        button("Menu", 100, 208, 200, 80, blue, bright_blue, menu_loop)
+        button("Scores", 100, 304, 200, 80, blue, bright_blue, scoreboard_loop)
+        button("Colours", 100, 401, 200, 80, blue, bright_blue, colours_loop)
+        button("Settings", 100, 497, 200, 80, blue, bright_blue, settings_loop)
+        button("Sliders", 100, 595, 200, 80, white, white, )
+        button("Quit", 1008, 595, 200, 80, red, bright_red, quit)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                quit()
+
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                pos = pygame.mouse.get_pos()
+                for s in slides:
+                    if s.button_rect.collidepoint(pos):
+                        s.hit = True
+                print(pos)  # check the position of the mouse when clicked
+
+                if pos[1] < 500 and pos[1] > 450:
+                    if pos[0] > 500 and pos[0] < 590:
+                        # checks if x value of mouse clicks the volume slider
+                        print("Checking volume")
+                        global Volume
+                        Volume = ((pos[0]) - 500) / 90
+                        # volume should be difference between value and min
+                        print(Volume)
+                        pygame.mixer.music.set_volume(Volume)
+                    if pos[0] > 900 and pos[0] < 990:
+                        # checks if x value of mouse clicks the gravity slider
+                        print("Checking gravity")
+                        global Gravity
+                        # 0.5   = min value
+                        # gravity should be difference between value and min
+                        Gravity = (0.5 + ((pos[0]) - 900) / 90)
+                        print(Gravity)
+
+            elif event.type == pygame.MOUSEBUTTONUP:
+                for s in slides:
+                    s.hit = False
+
+        ScreenText(username, 40, 429, 635)
+        # Move slides
+        for s in slides:
+            if s.hit:
+                s.move()
+
+        for s in slides:
+            s.draw()
+
+        pygame.display.update()
+        clock.tick(60)
+
+
+def settings_loop():
+    setting = True
+    global AI
+
+    while setting:
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                quit()
+
+        global checkTime, GameTime
+        checkTime = True
+
+        # Background colour text box
+        input_box3 = InputBox(740, 280, 200, 32)
+        input_boxes = [input_box3]
+        done = False
+
+        while not done:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    done = True
+                for box in input_boxes:
+                    box.handle_event(event)
+
+            for box in input_boxes:
+                box.update()
+
+            screen.fill(background_colour)
+            if chosenbackgcolour == (0, 0, 0):
+                bg = pygame.image.load('BlueSetting.png')
+            elif chosenbackgcolour == (0, 0, 255):
+                bg = pygame.image.load('NightSetting.png')
+            elif chosenbackgcolour == (255, 233, 0):
+                bg = pygame.image.load('SunnySetting.png')
+            elif chosenbackgcolour == (34, 139, 34):
+                bg = pygame.image.load('JungleSetting.png')
+
+            screen.blit(bg, (0, 0))
+
+            for box in input_boxes:
+                box.draw(screen)
+
+                ScreenText(username, 40, 429, 635)
+
+                button("Start", 100, 112, 200, 80, green, bright_green, game_loop)
+                button("Menu", 100, 208, 200, 80, blue, bright_blue, menu_loop)
+                button("Scores", 100, 304, 200, 80, blue, bright_blue, scoreboard_loop)
+                button("Colours", 100, 401, 200, 80, blue, bright_blue, colours_loop)
+                button("Settings", 100, 497, 200, 80, white, white, settings_loop)
+                button("Sliders", 100, 595, 200, 80, blue, bright_blue, sliders_loop)
+                button("Quit", 1008, 595, 200, 80, red, bright_red, quit)
+                button("Controls", 730, 440, 250, 100, blue, bright_blue, controls_loop)
+                if AI == True:
+                    button("2 player", 420, 320, 160, 64, white, bright_green, twoplayer)
+                if AI == False:
+                    button("Play with AI", 420, 190, 160, 64, white, bright_green, AImode)
+
+            pygame.display.update()
+            pygame.display.flip()
+            clock.tick(60)
+
+
+def colours_loop():
+    CheckColours = True
+
+    while CheckColours:
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                quit()
+
+        global checkTime, GameTime, AI
+        checkTime = True
+
+        # Background colour text box
+        input_box3 = InputBox(530, 230, 200, 32)
+        # Car colour text box
+        input_box4 = InputBox(530, 430, 200, 32)
+        input_boxes = [input_box3, input_box4]
+        done = False
+
+        while not done:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    done = True  # stop the loop
+                for box in input_boxes:  # for each text  box
+                    box.handle_event(event)  # start the handle_event function inside class
+
+            for box in input_boxes:
+                box.update()  # update the box whenever loop continues
+
+            screen.fill(background_colour)
+
+            if chosenbackgcolour == (0, 0, 0):
+                bg = pygame.image.load('BlueColour.png')
+            elif chosenbackgcolour == (0, 0, 255):
+                bg = pygame.image.load('NightColour.png')
+            elif chosenbackgcolour == (255, 233, 0):
+                bg = pygame.image.load('SunnyColour.png')
+            elif chosenbackgcolour == (34, 139, 34):
+                bg = pygame.image.load('JungleColour.png')
+
+            screen.blit(bg, (0, 0))  # blit image to top right of screen
+            for box in input_boxes:
+                box.draw(screen)  # draw box onto screen
+
+                ScreenText(username, 40, 429, 635)
+
+                button("Start", 100, 112, 200, 80, green, bright_green, game_loop)
+                button("Menu", 100, 208, 200, 80, blue, bright_blue, menu_loop)
+                button("Scores", 100, 304, 200, 80, blue, bright_blue, scoreboard_loop)
+                button("Colours", 100, 401, 200, 80, white, white, )
+                button("Settings", 100, 497, 200, 80, blue, bright_blue, settings_loop)
+                button("Sliders", 100, 595, 200, 80, blue, bright_blue, sliders_loop)
+                button("Quit", 1008, 595, 200, 80, red, bright_red, quit)
+
+            pygame.display.update()
+            pygame.display.flip()
+            clock.tick(60)
+
+
+def twoplayer():
+    global AI
+    AI = False
+    print("2 player mode selected")
+
+
+def AImode():
+    global AI
+    AI = True
+    print("AI selected")
+
+
+def controls_loop():
+    controls = True
+
+    while controls:  # constant loop to display screen
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:  # check for any inputs, and if user exits game
+                quit()  # quit game
+
+        bg = pygame.image.load('ControlsImage.png')
+        screen.blit(bg, (0, 0))  # display image to screen
+        button("Settings", 960, 520, 200, 75, white, background_colour, settings_loop)
+        # button should be at bottom right of the screen, which goes back to settings
+        pygame.display.update()  # update screen
+        clock.tick(60)  # keep at solid fps for the button to check for mouse
+
+
+def scoreboard_loop():
+    scoreboard = True
+
+    while scoreboard:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                quit()
+
+        screen.fill(background_colour)
+        if chosenbackgcolour == (0, 0, 0):
+            bg = pygame.image.load('BlueScore.png')
+        elif chosenbackgcolour == (0, 0, 255):
+            bg = pygame.image.load('NightScore.png')
+        elif chosenbackgcolour == (255, 233, 0):
+            bg = pygame.image.load('SunnyScore.png')
+        elif chosenbackgcolour == (34, 139, 34):
+            bg = pygame.image.load('JungleScore.png')
+
+        screen.blit(bg, (0, 0))
+
+        ScoreText = pygame.font.SysFont("comicsansms", 40)
+
+        ScreenText("Scoreboard", 80,((display_width / 2) + 100), (display_height / 10))
+
+        ScoreFile = open("ListOfScore", "r")
+        LIST = []  # open array, with nothing inside
+        for line in ScoreFile:
+            stripped_line = line.strip()  # check each line in the array
+            line_list = stripped_line.split()  # split each line by checking for a ' '
+            LIST.append(line_list)  # add each value into the array, each line is 1 array
+
+        ScoreFile.close()
+
+        def Sort(LIST):
+            return (sorted(LIST, key=lambda x: x[1], reverse=True))
+            # sorted = sorts array by itself, reverse=True makes the sort descending
+            # key=lambda returns iterable in order
+
+        SortedList = Sort(LIST)
+
+        Yaxis = 248
+        Yaxis2 = 248
+        for line in SortedList:
+            InfoTextSurf, InfoTextRect = text_objects(line[0], ScoreText)
+            # info[0] = only paste username not password
+            InfoTextRect.center = (565, Yaxis)
+            Yaxis = Yaxis + 80
+            screen.blit(InfoTextSurf, InfoTextRect)
+        for line in SortedList:
+            Info2TextSurf, Info2TextRect = text_objects(line[1], ScoreText)
+            Info2TextRect.center = (925, Yaxis2)
+            Yaxis2 = Yaxis2 + 80
+            screen.blit(Info2TextSurf, Info2TextRect)
+
+        ScreenText(username, 40, 429, 635)
+
+        button("Start", 100, 112, 200, 80, green, bright_green, game_loop)
+        button("Menu", 100, 208, 200, 80, blue, bright_blue, menu_loop)
+        button("Scores", 100, 304, 200, 80, white, white, )
+        button("Colours", 100, 401, 200, 80, blue, bright_blue, colours_loop)
+        button("Settings", 100, 497, 200, 80, blue, bright_blue, settings_loop)
+        button("Sliders", 100, 595, 200, 80, blue, bright_blue, sliders_loop)
+        button("Quit", 1008, 595, 200, 80, red, bright_red, quit)
+
+        pygame.display.update()
+        pygame.display.flip()
+        clock.tick(60)
+
+
+def end_screen():
+    end = True
+    GameoverSound.play()  # plays sound to show game is over
+    while end:
+        for event in pygame.event.get():  # check for any event or frame switch
+            if event.type == pygame.QUIT:  # if user exits screen
+                quit()  # quit game
+
+        if chosenbackgcolour == (0, 0, 0):  # check if background colour is not default
+            screen.fill(background_colour)
+        else:
+            screen.fill(chosenbackgcolour)  # fill background with new colour inputted by user
+
+        ScreenText("Your total points is : " + str(PlayerScore), 80, (display_width / 2), (display_height / 8))
+
+
+
+
+        global username # get username from global login info
+
+        # Read in the file
+        with open('ListOfScore', 'r') as file:
+            filedata = file.read() # read file and save file
+
+        for line in open('ListOfScore',
+                         'r').readlines():  # Read the lines
+            login_info = line.split() # split each line by looking for space
+            if login_info[0] == username and int(login_info[1]) < int(PlayerScore):
+                # check if new score is higher then previous score
+                filedata = filedata.replace(login_info[1], str(PlayerScore)) # replace number with new score if higher
+
+        # Write the file out again
+        with open('ListOfScore', 'w') as file:
+            file.write(filedata) # save data after writing to file
+
+        button("Play Again", 590, 200, 100, 50, green, bright_green, game_loop)
+        button("Scoreboard", 590, 400, 100, 50, blue, bright_blue, scoreboard_loop)
+        button("Quit", 590, 600, 100, 50, red, bright_red, quit)
+        button("Log off", 890, 600, 100, 50, red, bright_red, login_screen)
+
+        pygame.display.update()
+        clock.tick(60)
+
+
+def pause():
+    paused = True
+    while paused:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                quit()
+
+            if event.type == pygame.KEYDOWN:  # check for any key presses
+                if event.key == pygame.K_p:  # check is p is pressed
+                    paused = False  # if pressed, then stop loop
+
+        bg = pygame.image.load('Pause.png')
+        screen.blit(bg, (0, 0))  # blit image to screen
+        pygame.mixer.music.pause()  # pause the music
+        pygame.display.update()  # update screen
+        clock.tick(5)  # check every 5 frames
+
+    if paused == False:  # if not paused then continue with music
+        pygame.mixer.music.play(-1)
+
+
+def game_loop():
+    gaming = True
+    global Gravity, GameTime, AI
+
+    if AI == True:
+        AiLeft = True
+    tile_size = 40
+
+    while gaming:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+        screen.fill(background_colour)
+        pygame.mixer.music.set_volume(Volume)
+        timer = GameTime
+
+        class Player(pygame.sprite.Sprite):  # use sprites to move player
+            def __init__(self, x, y):  # test for player, with x / y values
+                pygame.sprite.Sprite.__init__(self)
+                self.images_right = []  # check which side it is facing
+                self.images_right_boost = []  # check for boosting
+                self.images_left = []
+                self.images_left_boost = []
+                self.index = 0  # reset the player's side
+                self.counter = 0  # count num of times player moves
+
+                if chosencarcolour == (0, 0, 255):  # check which colour has been chosen & add 3 images
+                    img_right = pygame.image.load('BlueCar-Right.png')  # car facing right
+                    img_right_boost = pygame.image.load(
+                        'BlueCar-Right-Boost.png')  # car boosting
+                elif chosencarcolour == (255, 0, 0):
+                    img_right = pygame.image.load(
+                        'RedCar-Right.png')
+                    img_right_boost = pygame.image.load(
+                        'RedCar-Right-Boost.png')
+                elif chosencarcolour == (0, 255, 0):
+                    img_right = pygame.image.load(
+                        'GreenCar-Right.png')
+                    img_right_boost = pygame.image.load(
+                        'GreenCar-Right-Boost.png')
+                else:
+                    img_right = pygame.image.load(
+                        'PurpleCar-Right.png')
+                    img_right_boost = pygame.image.load('PurpleCar-Right-Boost.png')
+
+                img_right = pygame.transform.scale(img_right, (160, 80))
+                # car is added to new variable, 160px wide and 80px tall
+                img_right_boost = pygame.transform.scale(img_right_boost, (200, 80))  # add to car, 40px wider for boost
+                img_left = pygame.transform.flip(img_right, True, False)  # flip right image
+                img_left_boost = pygame.transform.flip(img_right_boost, True, False)  # flip right boosting image
+                self.images_right.append(img_right)  # add to image
+                self.images_right_boost.append(img_right_boost)  # add to image
+                self.images_left_boost.append(img_left_boost)  # add to image
+                self.images_left.append(img_left)  # add to image
+                self.image = self.images_right[self.index]  # add images based off index
+                self.rect = self.image.get_rect()  # get the rect/hitbox off image
+                self.points = 0  # check for player's points
+                self.scores = 0  # check for the player's scores
+                self.rect.x = x  # check x value
+                self.rect.y = y  # check y value
+                self.width = self.image.get_width()  # width & height will be used later
+                self.height = self.image.get_height()
+                self.vel_y = 0  # velocity is how fast the car goes
+                self.jumped = False  # assume car has not jumped
+                self.direction = 0  # assume car is facing correct position
+
+            def update(self):
+                dx = 0  # gradient of movement in x direction
+                dy = 0  # check for movement in y direction
+                TestForMovement = 4  # time before player moves
+
+                # get key presses
+                key = pygame.key.get_pressed()
+                if key[pygame.K_w] and self.jumped == False:  # check if jumped and not jumped before
+                    self.vel_y = (-12 * Gravity)
+                    self.jumped = True
+                    jumpSound.play()
+                if key[pygame.K_w] == False:
+                    self.jumped = False
+                if key[pygame.K_a]:  # check if user pressed a
+                    dx -= 4  # move left by 4px
+                    self.counter += 1  # they have moved by 1 frame
+                    self.direction = -1  # what direction are they going
+                if key[pygame.K_a] and key[pygame.K_SPACE]:  # check if they want to also boost
+                    dx -= 8  # move left by 8px
+                    self.counter += 1  # they have moved by 1 frame
+                    self.direction = -2  # what direction are they going
+                # d = same movement but opposite direction
+                if key[pygame.K_d]:
+                    dx += 4
+                    self.counter += 1
+                    self.direction = 1
+                if key[pygame.K_d] and key[pygame.K_SPACE]:
+                    dx += 8
+                    self.counter += 1
+                    self.direction = 2
+
+                if key[pygame.K_a] == False and key[pygame.K_d] == False:  # check if user doesnt press any button
+                    self.counter = 0  # keep user stationary
+                    self.index = 0  # do not move the user
+
+                # handle animation
+                if self.counter > TestForMovement:  # have they held down a button for 4 frames
+                    self.counter = 0  # reset counter
+                    self.index += 1  # increase index
+                    if self.index >= len(self.images_right):  # check if they moved
+                        self.index = 0  # reset index
+                    if self.direction == 1:  # check direction that they pressed
+                        self.image = self.images_right[self.index]  # display new image with the image they selected
+                    if self.direction == -1:
+                        self.image = self.images_left[self.index]
+                    if self.direction == 2:
+                        self.image = self.images_right_boost[self.index]
+                    if self.direction == -2:
+                        self.image = self.images_left_boost[self.index]
+
+                # make user jump, cannot jump forever, using gravity
+                self.vel_y += 1
+                if self.vel_y > (10 * Gravity):
+                    self.vel_y = (10 * Gravity)
+                dy += self.vel_y
+
+                # update player coordinates
+                self.rect.x += dx
+                self.rect.y += dy
+
+                # car cannot be below tile 1 (below ground)
+                if self.rect.bottom > 680:
+                    self.rect.bottom = 680
+
+                # car cannot be above tile 2 (above roof)
+                if self.rect.top < 80:
+                    self.rect.top = 80
+
+                # car cannot be on the right or left of screen
+                if self.rect.right > 1240:
+                    self.rect.right = 1240
+
+                if self.rect.left < 40:
+                    self.rect.left = 40
+
+                # draw player onto screen
+                screen.blit(self.image, self.rect)
+
+        player = Player(120, display_height - 130)  # x and y value of car spawn
+
+        class Opponent(pygame.sprite.Sprite):
+            def __init__(self, x, y):  # check the x/y values
+                pygame.sprite.Sprite.__init__(self)
+                self.images_right = []  # array to hold sprite data
+                self.images_right_boost = []
+                self.images_left = []
+                self.images_left_boost = []
+                self.index = 0
+                self.counter = 0
+                if chosencarcolour == (0, 0, 255):  # check for opposite of colour
+                    img_right = pygame.image.load(
+                        'RedCar-Right.png')  # load images
+                    img_right_boost = pygame.image.load(
+                        'RedCar-Right-Boost.png')
+                    img_left_boost = pygame.image.load(
+                        'RedCar-Left-Boost.png')
+                elif chosencarcolour == (255, 0, 0):
+                    img_right = pygame.image.load('BlueCar-Right.png')
+                    img_right_boost = pygame.image.load(
+                        'BlueCar-Right-Boost.png')
+                    img_left_boost = pygame.image.load(
+                        'BlueCar-Left-Boost.png')
+                elif chosencarcolour == (0, 255, 0):
+                    img_right = pygame.image.load(
+                        'PurpleCar-Right.png')
+                    img_right_boost = pygame.image.load(
+                        'PurpleCar-Right-Boost.png')
+                    img_left_boost = pygame.image.load(
+                        'PurpleCar-Left-Boost.png')
+                else:
+                    img_right = pygame.image.load(
+                        'GreenCar-Right.png')
+                    img_right_boost = pygame.image.load(
+                        'GreenCar-Right-Boost.png')
+                    img_left_boost = pygame.image.load(
+                        'GreenCar-Left-Boost.png')
+
+                img_right = pygame.transform.scale(img_right, (160, 80))
+                img_right_boost = pygame.transform.scale(img_right_boost, (200, 80))
+                img_left = pygame.transform.flip(img_right, True, False)
+                img_left_boost = pygame.transform.scale(img_left_boost, (200, 80))
+                self.images_right.append(img_right)
+                self.images_left.append(img_left)
+                self.images_right_boost.append(img_right_boost)
+                self.images_left_boost.append(img_left_boost)  # append all images to new image rects
+                self.image = self.images_left[self.index]  # start opponent facing left
+                self.rect = self.image.get_rect()
+                self.points = 0  # contain all points and scores for user
+                self.scores = 0
+                self.rect.x = x  # hit box of x/y values are the same as x/y values
+                self.rect.y = y
+                self.width = self.image.get_width()  # get width/height of hitbox
+                self.height = self.image.get_height()
+                self.vel_y = 0
+                self.jumped = False  # check if user has jumped
+                self.direction = 0  # default direction
+
+            def update(self):
+                dx = 0
+                dy = 0
+                TestForMovement = 4
+
+                # get keypresses
+                key = pygame.key.get_pressed()
+                if key[pygame.K_UP] and self.jumped == False:
+                    self.vel_y = (-12 * Gravity)
+                    self.jumped = True
+                    jumpSound.play()
+                if key[pygame.K_UP] == False:
+                    self.jumped = False
+                if key[pygame.K_LEFT]:  # check if user presses left key
+                    dx -= 4  # move user left
+                    self.counter += 1
+                    self.direction = -1
+                if key[pygame.K_LEFT] and key[pygame.K_l]:
+                    dx -= 8  # move user left by 8px if boosting
+                    self.counter += 1
+                    self.direction = -2
+                if key[pygame.K_RIGHT]:  # check if user presses right key
+                    dx += 4  # move user right
+                    self.counter += 1
+                    self.direction = 1
+                if key[pygame.K_RIGHT] and key[pygame.K_l]:
+                    dx += 8  # move user right by 8px if boosting
+                    self.counter += 1
+                    self.direction = 2
+                if key[pygame.K_LEFT] == False and key[pygame.K_RIGHT] == False:
+                    self.counter = 0
+                    self.index = 0
+
+                # handle animation
+                if self.counter > TestForMovement:
+                    self.counter = 0
+                    self.index += 1
+                    if self.index >= len(self.images_right):
+                        self.index = 0
+                    if self.direction == 1:
+                        self.image = self.images_right[self.index]
+                    if self.direction == -1:
+                        self.image = self.images_left[self.index]
+                    if self.direction == 2:
+                        self.image = self.images_right_boost[self.index]
+                    if self.direction == -2:
+                        self.image = self.images_left_boost[self.index]
+                # add gravity
+                self.vel_y += 1
+                if self.vel_y > (10 * Gravity):
+                    self.vel_y = (10 * Gravity)
+                dy += self.vel_y
+
+                # update player coordinates
+                self.rect.x += dx
+                self.rect.y += dy
+
+                # car cannot be below tile 1 (below ground)
+                if self.rect.bottom > 680:
+                    self.rect.bottom = 680
+                    dy = 0
+                # car cannot be above tile 2 (above roof)
+                if self.rect.top < 80:
+                    self.rect.top = 80
+                    dy = 0
+                # car cannot be on the right or left of screen
+                if self.rect.right > 1240:
+                    self.rect.right = 1240
+                    dx = 0
+                if self.rect.left < 40:
+                    self.rect.left = 40
+                    dx = 0
+                # draw player onto screen
+                screen.blit(self.image, self.rect)
+
+
+
+        class Ai(pygame.sprite.Sprite):
+            def __init__(self): # take in itself
+                pygame.sprite.Sprite.__init__(self) # add to sprite list
+                self.images_right = [] # add images of ai facing right/left
+                self.images_left = []
+                self.index = 0
+                self.counter = 0
+                if chosencarcolour == (0, 0, 255):
+                    img_right = pygame.image.load(
+                        'RedCar-Right.png') # load images of AI
+                elif chosencarcolour == (255, 0, 0):
+                    img_right = pygame.image.load('BlueCar-Right.png') # opposite colour of player 1
+                elif chosencarcolour == (0, 255, 0):
+                    img_right = pygame.image.load(
+                        'PurpleCar-Right.png')
+                else:
+                    img_right = pygame.image.load(
+                        'GreenCar-Right.png')
+
+                img_right = pygame.transform.scale(img_right, (160, 80)) # change width. height of AI
+                img_left = pygame.transform.flip(img_right, True, False) # make image left by flipping previous image
+                self.images_right.append(img_right) # add to sprite
+                self.images_left.append(img_left) # add to sprite
+                self.image = self.images_right[self.index] # assume default image
+                self.rect = self.image.get_rect() # add rect to image
+                self.points = 0
+                self.scores = 0
+
+                if AiLeft == True:
+                    self.image = self.images_left[self.index]
+                if AiLeft == False:
+                    self.image = self.images_right[self.index]
+
+
+
+
+        class Ball(pygame.sprite.Sprite):
+            def __init__(self):
+                pygame.sprite.Sprite.__init__(self)  # load sprite class
+                ball_img = pygame.image.load('ball.png')  # load ball image
+                ball_img = pygame.transform.scale(ball_img, (80, 80))  # rezie ball image to 80px by 80px
+                self.image = ball_img
+                self.rect = self.image.get_rect()  # get rect of image
+                self.speed = 10  # speed of ball movement should be 10px
+                self.dx = 1
+                self.dy = 1
+
+                self.width = self.image.get_width()
+                self.height = self.image.get_height()
+                self.vel_y = 0  # get velocity of ball
+
+            def update(self):
+                dx = 0
+                dy = 0
+                self.vel_y += 1
+                # gravity of ball
+                if self.vel_y > (2.5 * Gravity):
+                    self.vel_y = (2.5 * Gravity)
+                dy += self.vel_y
+
+                # update ball coordinates
+                self.rect.x += dx
+                self.rect.y += dy
+
+                if self.rect.bottom > 680:
+                    self.rect.bottom = 680
+                    dy = 0
+                # ball cannot be above tile 2 (above roof)
+                if self.rect.top < 80:
+                    self.rect.top = 80
+                    dy = 0
+
+        ball = Ball()
+        ball.rect.x = 640
+        ball.rect.y = 590
+
+        # coordinate of opponent spawn
+        if AI:
+            ai = Ai()
+            ai.rect.x = 1020
+            ai.rect.y = 590
+
+        else:
+            opponent = Opponent(1020, display_height - 130)
+
+
+
+        all_sprites = pygame.sprite.Group()
+        if AI:
+            all_sprites.add(player, ai, ball)
+        else:
+            all_sprites.add(player, opponent, ball)
+
+        def redraw():
+
+            font = pygame.font.SysFont('comicsansms', 30)  # font = comicsansms, size = 30
+
+            # timer
+            t1 = font.render(str(int(timer)), False, white)  # text, antialising, colour = white
+            t1rect = t1.get_rect()
+            t1rect.center = (640, 40)
+            screen.blit(t1, t1rect)
+            # Player 1 Score
+            p1_score = font.render(str(player.points), False, white)  # text, antialising, colour = white
+            p1Rect = p1_score.get_rect()
+            p1Rect.center = (80, 40)
+            screen.blit(p1_score, p1Rect)
+
+            # AI Score
+            if AI == True:
+                p2_score = font.render(str(ai.points), False, white) # show the AI points
+                p2Rect = p2_score.get_rect()
+                p2Rect.center = (1200, 40)
+                screen.blit(p2_score, p2Rect)
+            # opponent score
+            else:
+                p2_score = font.render(str(opponent.points), False, white) # show the opponents points
+                p2Rect = p2_score.get_rect()
+                p2Rect.center = (1200, 40)
+                screen.blit(p2_score, p2Rect)
+
+            # Scores update
+            p1_update = font.render("Score added: " + str(player.scores), False, white)  # text, antialising, colour = white
+            p1ScoreRect = p1_update.get_rect()
+            p1ScoreRect.center = (400, 40)
+            screen.blit(p1_update, p1ScoreRect)
+
+            # Updates all Sprites
+            all_sprites.draw(screen)
+
+            # Draws updates
+            pygame.display.update()
+
+        class World():
+            def __init__(self, data):
+                self.tile_list = []  # use the World_tileMap []
+
+                # load background image
+
+                if chosenbackgcolour == (34, 139, 34):  # check for each background colour selected
+                    backg_img = pygame.image.load('jungle.png')
+                    goal_img = pygame.image.load('GreenGoal.png')
+                if chosenbackgcolour == (0, 0, 255):
+                    backg_img = pygame.image.load('night.png')
+                    goal_img = pygame.image.load('NightGoal.png')
+                if chosenbackgcolour == (255, 233, 0):
+                    backg_img = pygame.image.load('sunny.png')
+                    goal_img = pygame.image.load('YellowGoal.png')
+                if chosenbackgcolour == (0, 0, 0):
+                    backg_img = pygame.image.load('backg.png')
+                    goal_img = pygame.image.load('BlueGoal.png')
+
+                top_img = pygame.image.load('Black.png')  # import the top and ground images
+                ground_img = pygame.image.load('Stone.png')
+
+                row_count = 0  # start by checking each row
+                for row in data:
+                    col_count = 0  # check each column in each row
+                    for tile in row:
+                        if tile == 1:  # if tile == the 1 (roof)
+                            img = pygame.transform.scale(top_img,
+                                                         (tile_size, tile_size))  # change image to size of tile
+                            img_rect = img.get_rect()  # get rect / hitbox of image
+                            img_rect.x = col_count * tile_size  # change x value of tile to image
+                            img_rect.y = row_count * tile_size  # change y value of tile to image
+                            tile = (img, img_rect)  # change tile to new image
+                            self.tile_list.append(tile)  # reset tile once done and add to tile map
+                        if tile == 0:  # if tile == the 0 (Middle area)
+                            img = pygame.transform.scale(backg_img, (tile_size, tile_size))
+                            img_rect = img.get_rect()
+                            img_rect.x = col_count * tile_size
+                            img_rect.y = row_count * tile_size
+                            tile = (img, img_rect)
+                            self.tile_list.append(tile)
+                        if tile == 2:  # if tile == the 2 (ground)
+                            img = pygame.transform.scale(ground_img, (tile_size, tile_size))
+                            img_rect = img.get_rect()
+                            img_rect.x = col_count * tile_size
+                            img_rect.y = row_count * tile_size
+                            tile = (img, img_rect)
+                            self.tile_list.append(tile)
+                        if tile == 3:  # if tile == the 3 (goal)
+                            img = pygame.transform.scale(goal_img, (tile_size, tile_size))
+                            img_rect = img.get_rect()
+                            img_rect.x = col_count * tile_size
+                            img_rect.y = row_count * tile_size
+                            tile = (img, img_rect)
+                            self.tile_list.append(tile)
+
+                        col_count += 1  # check next column
+                    row_count += 1  # check next row
+
+            def draw(self):  # draw this onto screen
+                for tile in self.tile_list:
+                    screen.blit(tile[0], tile[1])  # display every tile x / y values
+
+        world_TileMap = [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+            [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+        ]
+
+        world = World(world_TileMap)
+
+        run = True
+
+        # Main Loop
+        while run:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    run = False
+
+            world.draw()
+            player.update()
+            if AI == False:
+                opponent.update()
+            # Runs redraw function above
+            redraw()
+
+            # goes to pause def, this pauses the game and doesn't change anything to the game
+            key = pygame.key.get_pressed()
+            if key[pygame.K_p]:  # check if user presses "p"
+                pause()
+            # brings the player back to the menu when pressing M
+            if key[pygame.K_m]:  # check if user presses "m"
+                menu_loop()
+
+            timer -= 0.03
+
+            if timer < 0:
+                print("Ended")
+                global PlayerScore
+                PlayerScore = player.scores
+                end_screen()
+            player_speed = 10
+            touch = False
+
+            # give additional 30 points if player shoots the ball into opposing net
+            if player.rect.colliderect(ball.rect) and player.rect.x > 920:
+                touch = True
+                player.scores += 30
+            # give additional points if player saves an opposing shot
+            if player.rect.colliderect(ball.rect) and player.rect.x < 360:
+                touch = True
+                player.scores += 30
+
+
+
+            # Movement for AI, follow the ball
+            if AI == True:
+                player_speed = player_speed * Gravity
+                # ai goes left
+                if (ai.rect.x > ball.rect.x) and ball.rect.x > 40:
+                    ai.rect.x += -(player_speed / 6)
+                    AiLeft = True
+                # ai goes right
+                if ai.rect.x < ball.rect.x and ball.rect.x < 1080:
+                    ai.rect.x += +(player_speed / 6)
+                    AiLeft = False
+                # ai goes down
+                if ai.rect.y < ball.rect.y:
+                    ai.rect.y += +(player_speed / 6)
+                # ai goes up
+                if ai.rect.y > ball.rect.y:
+                    ai.rect.y += -(player_speed / 6)
+                    jumpSound.play()
+
+
+
+            if player.rect.colliderect(ball.rect):
+                touch = True
+                # if player hits ball touch = true
+            if AI == False:
+                if opponent.rect.colliderect(ball.rect):
+                    touch = True # if opponent hits ball touch = true
+            if AI:
+                if ai.rect.colliderect(ball.rect):
+                    touch = True
+            if touch == True:
+                # if player touches ball, check where ball goes, and add points to player for touching the ball
+                # check if player right of ball
+                if (player.rect.x > ball.rect.x) and player.rect.colliderect(ball.rect):
+                    ball.rect.x -= ball.speed * ball.dx
+                # check if player is left of ball
+                if (player.rect.x < ball.rect.x) and player.rect.colliderect(ball.rect):
+                    ball.rect.x += ball.speed * ball.dx
+                # check if player lower then ball
+                if (player.rect.y < ball.rect.y) and player.rect.colliderect(ball.rect):
+                    ball.rect.y += ball.speed * ball.dy
+                # check if player above ball
+                if (player.rect.y < ball.rect.y) and player.rect.colliderect(ball.rect):
+                    ball.rect.y -= ball.speed * ball.dy
+                if AI == False:
+                    # same format for opponent
+                    if (opponent.rect.x > ball.rect.x) and opponent.rect.colliderect(ball.rect):
+                        ball.rect.x -= ball.speed * ball.dx
+
+                    if (opponent.rect.x < ball.rect.x) and opponent.rect.colliderect(ball.rect):
+                        ball.rect.x += ball.speed * ball.dx
+
+                    if (opponent.rect.y < ball.rect.y) and opponent.rect.colliderect(ball.rect):
+                        ball.rect.y += ball.speed * ball.dy
+
+                    if (opponent.rect.y < ball.rect.y) and opponent.rect.colliderect(ball.rect):
+                        ball.rect.y -= ball.speed * ball.dy
+
+                    if player.rect.colliderect(opponent.rect) and player.rect.colliderect(ball.rect):
+                        # check if both cars pinch ball
+                        ball.rect.y -= ball.speed * ball.dy
+                if AI == True:
+                    # same format for AI
+                    if (ai.rect.x > ball.rect.x) and ai.rect.colliderect(ball.rect):
+                        ball.rect.x -= ball.speed * ball.dx
+
+                    if (ai.rect.x < ball.rect.x) and ai.rect.colliderect(ball.rect):
+                        ball.rect.x += ball.speed * ball.dx
+
+                    if (ai.rect.y < ball.rect.y) and ai.rect.colliderect(ball.rect):
+                        ball.rect.y += ball.speed * ball.dy
+
+                    if (ai.rect.y < ball.rect.y) and ai.rect.colliderect(ball.rect):
+                        ball.rect.y -= ball.speed * ball.dy
+                    # check if AI and player 1 collide/ pinch the ball
+                    if player.rect.colliderect(ai.rect) and player.rect.colliderect(ball.rect):
+                        # check if both cars pinch ball
+                        ball.rect.y -= ball.speed * ball.dy
+
+
+
+            # give point to player 1 when scored
+            if ball.rect.x > 1200:
+                ball.rect.x, ball.rect.y = 640, 590 # reset ball spawn
+                ScoreSound.play() # play scored sound
+                player.scores += 150
+                player.points += 1
+                player.rect.x = 120 # reset player spawn
+                player.rect.y = 590 # reset player 2 spawn
+                if AI == False:
+                    opponent.rect.x = 1020
+                    opponent.rect.y = 590
+                else:
+                    ai.rect.x = 1020
+                    ai.rect.y = 590
+
+            # give point to opposing player
+            if ball.rect.x < 40:
+                ball.rect.x, ball.rect.y = 640, 590 # reset ball spawn
+                ScoreSound.play() # play scored sound
+
+                player.rect.x = 120 # reset player spawn
+                player.rect.y = 590 # reset player 2 spawn
+                if AI == False:
+                    opponent.rect.x = 1020
+                    opponent.rect.y = 590
+                    opponent.points += 1
+                else:
+                    ai.rect.x = 1020
+                    ai.rect.y = 590
+                    ai.points += 1
+
+            ball.update()
+
+
+
+            pygame.time.delay(15)
+            pygame.display.update()
+
+        pygame.quit()
+        quit()
+
+
+game_intro()
+quit()
